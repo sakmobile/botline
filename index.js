@@ -1,53 +1,30 @@
-var express = require('express')
-var bodyParser = require('body-parser')
-var request = require('request')
-var app = express()
+const express = require('express')
+const middleware = require('@line/bot-sdk').middleware
+const JSONParseError = require('@line/bot-sdk').JSONParseError
+const SignatureValidationFailed = require('@line/bot-sdk').SignatureValidationFailed
 
-app.use(bodyParser.json())
+const app = express()
 
-app.set('port', (process.env.PORT || 4000))
-app.use(bodyParser.urlencoded({extended: true}))
-app.use(bodyParser.json())
-
-app.post('/callback', (req, res) => {
-  var text = req.body.events[0].message.text
-  var sender = req.body.events[0].source.userId
-  var replyToken = req.body.events[0].replyToken
-  console.log(text, sender, replyToken)
-  console.log(typeof sender, typeof text)
-  // console.log(req.body.events[0])
-  if (text === 'สวัสดี' || text === 'Hello' || text === 'hello') {
-    sendText(sender, text)
-  }
-  res.sendStatus(200)
-})
-
-function sendText (sender, text) {
-  let data = {
-    to: sender,
-    messages: [
-      {
-        type: 'text',
-        text: 'สวัสดีค่ะ เราเป็นผู้ช่วยปรึกษาด้านความรัก สำหรับหมามิ้น 💞'
-      }
-    ]
-  }
-  request({
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer F4ptH38wFe7cYDr7B+0L+GxHxFDEixnLmeNIF5d+NYzh2ne0QgFNTNeceqyz95dwe+TW7DaVgb/qWr4RC9+M+xLFgCGx/BRF8UVaaHU1T1zIv/OqFUWytzW3mzZGbh0MiBqcLb0IJMqj30vQHWt7fgdB04t89/1O/w1cDnyilFU='
-    },
-    url: 'https://api.line.me/v2/bot/message/push',
-    method: 'POST',
-    body: data,
-    json: true
-  }, function (err, res, body) {
-    if (err) console.log('error')
-    if (res) console.log('success')
-    if (body) console.log(body)
-  })
+const config = {
+  channelAccessToken: 'F4ptH38wFe7cYDr7B+0L+GxHxFDEixnLmeNIF5d+NYzh2ne0QgFNTNeceqyz95dwe+TW7DaVgb/qWr4RC9+M+xLFgCGx/BRF8UVaaHU1T1zIv/OqFUWytzW3mzZGbh0MiBqcLb0IJMqj30vQHWt7fgdB04t89/1O/w1cDnyilFU=',
+  channelSecret: 'fe7d4b6ce4b6fb904bf6fc0861ca26bb'
 }
 
-app.listen(app.get('port'), function () {
-  console.log('run at port', app.get('port'))
+app.use(middleware(config))
+
+app.post('/webhook', (req, res) => {
+  res.json(req.body.events) // req.body will be webhook event object
 })
+
+app.use((err, req, res, next) => {
+  if (err instanceof SignatureValidationFailed) {
+    res.status(401).send(err.signature)
+    return
+  } else if (err instanceof JSONParseError) {
+    res.status(400).send(err.raw)
+    return
+  }
+  next(err) // will throw default 500
+})
+
+app.listen(8080)
